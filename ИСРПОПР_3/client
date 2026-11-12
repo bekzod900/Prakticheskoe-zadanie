@@ -1,0 +1,42 @@
+import json
+import socket
+import msgpack
+import cbor2
+import profile_pb2
+from data import PROFILE
+
+HOST, PORT = "127.0.0.1", 9999
+FMT = "json"  # json, msgpack, cbor, protobuf
+CODES = {"json": b"J", "msgpack": b"M", "cbor": b"C", "protobuf": b"P"}
+
+def make_protobuf():
+    p = profile_pb2.Profile()
+    p.id = PROFILE["id"]
+    p.name = PROFILE["name"]
+    p.age = PROFILE["age"]
+    p.is_student = PROFILE["is_student"]
+    p.courses.extend(PROFILE["courses"])
+    p.address.city = PROFILE["address"]["city"]
+    p.address.zip = PROFILE["address"]["zip"]
+    return p.SerializeToString()
+
+def encode():
+    if FMT == "json":
+        return json.dumps(PROFILE, ensure_ascii=False).encode("utf-8")
+    if FMT == "msgpack":
+        return msgpack.packb(PROFILE, use_bin_type=True)
+    if FMT == "cbor":
+        return cbor2.dumps(PROFILE)
+    if FMT == "protobuf":
+        return make_protobuf()
+    raise ValueError("FMT должен быть json, msgpack, cbor или protobuf")
+
+def main():
+    payload = encode()
+    print(f"Отправка в формате {FMT}, размер: {len(payload)} байт")
+    with socket.create_connection((HOST, PORT), timeout=5) as client:
+        client.sendall(CODES[FMT] + len(payload).to_bytes(4, "big") + payload)
+        print("Ответ сервера:", client.recv(32).decode("ascii", errors="replace"))
+
+if __name__ == "__main__":
+    main()
